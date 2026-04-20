@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hapi}
+      POSTGRES_DB: ${POSTGRES_DB:-hapi}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hapi}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  hapi-fhir:
+    image: hapiproject/hapi:${HAPI_FHIR_VERSION:-v7.4.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      spring.datasource.url: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-hapi}
+      spring.datasource.username: ${POSTGRES_USER:-hapi}
+      spring.datasource.password: ${POSTGRES_PASSWORD:-hapi}
+      spring.datasource.driverClassName: org.postgresql.Driver
+      spring.jpa.properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+      hapi.fhir.fhir_version: R4
+    ports:
+      - "${HAPI_FHIR_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/fhir/metadata"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  bridge:
+    build:
+      context: ./bridge
+    depends_on:
+      hapi-fhir:
+        condition: service_started
+    environment:
+      BRIDGE_HTTP_PORT: 8000
+      BRIDGE_MLLP_PORT: 2575
+      BRIDGE_LOG_LEVEL: ${BRIDGE_LOG_LEVEL:-INFO}
+      BRIDGE_FHIR_BASE_URL: http://hapi-fhir:8080/fhir
+    ports:
+      - "${BRIDGE_HTTP_PORT:-8000}:8000"
+      - "${BRIDGE_MLLP_PORT:-2575}:2575"
+
+  viewer:
+    build:
+      context: ./viewer
+    depends_on:
+      - bridge
+    environment:
+      VITE_FHIR_BASE_URL: http://localhost:${HAPI_FHIR_PORT:-8080}/fhir
+      VITE_BRIDGE_API_URL: http://localhost:${BRIDGE_HTTP_PORT:-8000}
+    ports:
+      - "${VIEWER_PORT:-5173}:5173"
+    volumes:
+      - ./viewer/src:/app/src
+      - ./viewer/index.html:/app/index.html
+      - ./viewer/vite.config.ts:/app/vite.config.ts
+
+volumes:
+  postgres-data:
