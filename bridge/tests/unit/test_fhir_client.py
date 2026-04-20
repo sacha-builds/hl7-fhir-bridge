@@ -35,6 +35,25 @@ async def test_conditional_create_sends_if_none_exist_header() -> None:
 
 
 @pytest.mark.asyncio
+async def test_conditional_update_issues_put_with_identifier_search() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={"resourceType": "Patient", "id": "abc"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as http:
+        client = FHIRClient("http://fhir.test/fhir", client=http)
+        patient = Patient(identifier=[{"system": "urn:id:HOSP", "value": "MRN1"}])
+        await client.conditional_update(patient, identifier_query="urn:id:HOSP|MRN1")
+
+    assert captured["method"] == "PUT"
+    assert captured["url"] == "http://fhir.test/fhir/Patient?identifier=urn%3Aid%3AHOSP%7CMRN1"
+
+
+@pytest.mark.asyncio
 async def test_conditional_create_without_identifier_query_omits_header() -> None:
     captured: dict = {}
 

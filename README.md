@@ -88,8 +88,8 @@ Once everything is up:
 ## Roadmap
 
 - [x] **Phase 0** — Repo scaffolding, Docker Compose, CI
-- [ ] **Phase 1** — MLLP listener, ADT^A01 → Patient + Encounter, golden-file tests
-- [ ] **Phase 2** — ADT^A03/A08, ORU^R01 → Observation + DiagnosticReport, LOINC, US Core validation
+- [x] **Phase 1** — MLLP listener, ADT^A01 → Patient + Encounter, golden-file tests
+- [x] **Phase 2** — ADT^A03/A08, ORU^R01 → Observation + DiagnosticReport, LOINC, US Core validation
 - [ ] **Phase 3** — Vue viewer: split-pane v2/FHIR, clinical chart, live WS updates
 - [ ] **Phase 4** — Synthea integration, Inferno conformance, metrics dashboard, audit log viewer
 - [ ] **Phase 5 (stretch)** — SMART on FHIR launch, CDS Hooks, FHIR Subscriptions, Bulk Data export
