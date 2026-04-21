@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useMessageStore } from '@/stores/messages';
@@ -6,9 +7,20 @@ import { useMessageStore } from '@/stores/messages';
 const router = useRouter();
 const store = useMessageStore();
 const { messages, loading } = storeToRefs(store);
+const clearing = ref(false);
 
 function openMessage(id: string) {
   router.push({ name: 'message', params: { id } });
+}
+
+async function clearInbox() {
+  if (!window.confirm('Clear the entire inbox and reset metrics?')) return;
+  clearing.value = true;
+  try {
+    await store.clearInbox();
+  } finally {
+    clearing.value = false;
+  }
 }
 
 function relativeTime(iso: string): string {
@@ -26,10 +38,49 @@ function chipClass(code: string): string {
 }
 </script>
 
+<style scoped>
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.header-row h1 {
+  margin-bottom: 0.25rem;
+}
+.header-row .muted {
+  margin: 0;
+}
+button.secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+button.secondary:hover:not(:disabled) {
+  background: var(--surface);
+}
+button.secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+</style>
+
 <template>
   <section>
-    <h1>Inbox</h1>
-    <p class="muted">Live stream of HL7 v2 messages received over MLLP.</p>
+    <div class="header-row">
+      <div>
+        <h1>Inbox</h1>
+        <p class="muted">Live stream of HL7 v2 messages received over MLLP.</p>
+      </div>
+      <button v-if="messages.length" class="secondary" :disabled="clearing" @click="clearInbox">
+        {{ clearing ? 'Clearing…' : 'Clear inbox' }}
+      </button>
+    </div>
 
     <div class="card" style="padding: 0">
       <table v-if="messages.length">

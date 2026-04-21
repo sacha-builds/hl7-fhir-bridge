@@ -20,6 +20,7 @@ from bridge.mappers import (
     map_adt_a08,
     map_oru_r01,
 )
+from bridge.metrics import Metrics
 from bridge.parsers import get_message_type
 from bridge.store import MessageRecord, MessageStore, ResourceRecord
 from bridge.store.messages import new_message_id, now_iso
@@ -38,9 +39,15 @@ MAPPERS: dict[tuple[str, str], Mapper] = {
 
 
 class MessageRouter:
-    def __init__(self, fhir_client: FHIRClient, store: MessageStore | None = None) -> None:
+    def __init__(
+        self,
+        fhir_client: FHIRClient,
+        store: MessageStore | None = None,
+        metrics: Metrics | None = None,
+    ) -> None:
         self._fhir = fhir_client
         self._store = store
+        self._metrics = metrics
 
     async def handle(self, raw_v2: str) -> str:
         message_type = "UNKNOWN"
@@ -128,6 +135,18 @@ class MessageRouter:
             ack_code = "AA"
             return ack
         finally:
+            if self._metrics is not None:
+                # Only count resources that were actually written (happens on
+                # AA ACKs; on AE we bailed out before writing).
+                resource_types_written = (
+                    [mr.resource.__class__.__name__ for mr in resources] if ack_code == "AA" else []
+                )
+                self._metrics.record_message(
+                    message_type=message_type,
+                    ack_code=ack_code,
+                    resource_types_written=resource_types_written,
+                    issue_severities=[i["severity"] for i in validation_issue_records],
+                )
             if self._store is not None:
                 record = MessageRecord(
                     id=new_message_id(),

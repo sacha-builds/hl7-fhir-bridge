@@ -76,6 +76,14 @@ class MessageStore:
     def get(self, message_id: str) -> MessageRecord | None:
         return self._by_id.get(message_id)
 
+    async def clear(self) -> None:
+        async with self._lock:
+            self._messages.clear()
+            self._by_id.clear()
+        payload = {"event": "messages.cleared", "data": {}}
+        for queue in list(self._subscribers):
+            queue.put_nowait(payload)
+
     async def subscribe(self) -> AsyncIterator[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=256)
         self._subscribers.add(queue)

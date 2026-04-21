@@ -16,6 +16,7 @@ const messages = useMessageStore();
       <nav class="nav-links">
         <router-link to="/" exact-active-class="active">Inbox</router-link>
         <router-link to="/patients" active-class="active">Patients</router-link>
+        <router-link to="/metrics" active-class="active">Metrics</router-link>
       </nav>
 
       <div class="nav-status">

@@ -28,6 +28,7 @@ dev = [
 
 [project.scripts]
 bridge = "bridge.main:main"
+bridge-replay = "bridge.scripts.replay:main"
 
 [build-system]
 requires = ["hatchling"]

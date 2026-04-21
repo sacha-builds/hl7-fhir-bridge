@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from bridge.fhir_client import FHIRClient
 from bridge.main import create_app
+from bridge.metrics import Metrics
 from bridge.router import MessageRouter
 from bridge.store import MessageStore
 
@@ -58,12 +59,14 @@ def app_with_mock_fhir():
 
     fhir_client = FHIRClient("http://fhir.test/fhir", client=http)
     store = MessageStore()
-    router = MessageRouter(fhir_client, store=store)
+    metrics = Metrics()
+    router = MessageRouter(fhir_client, store=store, metrics=metrics)
 
     @asynccontextmanager
     async def test_lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.fhir_client = fhir_client
         app.state.store = store
+        app.state.metrics = metrics
         app.state.router = router
         app.state.mllp = None
         yield
@@ -149,3 +152,37 @@ def test_fhir_proxy_forwards_reads_to_upstream(app_with_mock_fhir) -> None:
     assert any(
         request.method == "GET" and request.url.path.endswith("/Patient") for request in fhir_calls
     )
+
+
+def test_metrics_endpoint_reflects_processed_messages(app_with_mock_fhir) -> None:
+    app, _ = app_with_mock_fhir
+    fixtures = Path(__file__).resolve().parents[1] / "fixtures"
+    raw = (fixtures / "adt_a01_simple.hl7").read_text()
+    with TestClient(app) as client:
+        before = client.get("/metrics").json()
+        assert before["messages_total"] == 0
+
+        client.post("/v2/replay", json={"message": raw})
+
+        after = client.get("/metrics").json()
+        assert after["messages_total"] == 1
+        assert after["messages_by_type"] == {"ADT^A01": 1}
+        assert after["messages_by_ack_code"] == {"AA": 1}
+        assert after["resources_written"]["Patient"] == 1
+        assert after["resources_written"]["Encounter"] == 1
+
+
+def test_delete_v2_messages_clears_inbox_and_metrics(app_with_mock_fhir) -> None:
+    app, _ = app_with_mock_fhir
+    fixtures = Path(__file__).resolve().parents[1] / "fixtures"
+    raw = (fixtures / "adt_a01_simple.hl7").read_text()
+    with TestClient(app) as client:
+        client.post("/v2/replay", json={"message": raw})
+        assert len(client.get("/v2/messages").json()) == 1
+        assert client.get("/metrics").json()["messages_total"] == 1
+
+        delete = client.delete("/v2/messages")
+        assert delete.status_code == 204
+
+        assert client.get("/v2/messages").json() == []
+        assert client.get("/metrics").json()["messages_total"] == 0

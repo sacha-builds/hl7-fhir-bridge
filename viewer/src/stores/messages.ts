@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import {
+  clearMessages,
   getMessage,
   listMessages,
   openEventStream,
@@ -90,7 +91,16 @@ export const useMessageStore = defineStore('messages', {
     handleEvent(event: BridgeEvent): void {
       if (event.event === 'message.received') {
         this.messages = [event.data, ...this.messages].slice(0, 200);
+      } else if (event.event === 'messages.cleared') {
+        this.messages = [];
+        this.details = {};
       }
+    },
+
+    async clearInbox(): Promise<void> {
+      await clearMessages();
+      this.messages = [];
+      this.details = {};
     },
   },
 });

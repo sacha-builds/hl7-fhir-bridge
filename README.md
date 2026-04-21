@@ -2,7 +2,7 @@
 
 An HL7 v2 → FHIR R4 interoperability bridge with a live clinical viewer. Ingests v2 messages over MLLP, maps them to FHIR resources conforming to US Core profiles, persists to a HAPI FHIR server, and streams the results to a Vue 3 clinical viewer in real time.
 
-> **Status:** Phase 0 — scaffolding. See [Roadmap](#roadmap).
+> **Status:** end-to-end working — MLLP in, conditional-create FHIR out, live Vue viewer with message inbox, patient chart, and metrics. See [Roadmap](#roadmap) for what's next.
 
 ## Why this exists
 
@@ -85,26 +85,84 @@ Once everything is up:
 | Bridge API       | http://localhost:8000             |
 | MLLP ingest      | `tcp://localhost:2575`            |
 
+## Demo
+
+The repo ships with a handful of curated HL7 v2 fixtures that tell a small
+clinical story (two admits, two lab panels, one demographics update, one
+discharge). Stream them through the bridge and watch the viewer:
+
+```bash
+# Terminal 1 — full stack
+docker compose up --build
+
+# Terminal 2 — replay the fixtures
+make replay
+# …or, for a live-feeling demo:
+make demo        # loops + shuffles + 1.5s pacing
+
+# Reset between runs
+make reset
+```
+
+Then open:
+
+- [http://localhost:5173](http://localhost:5173) — **Inbox** fills up live over WebSocket; click any row for the split-pane v2 ↔ FHIR view.
+- [http://localhost:5173/patients](http://localhost:5173/patients) — patient list read from HAPI FHIR through the bridge proxy.
+- [http://localhost:5173/metrics](http://localhost:5173/metrics) — throughput, accept rate, resources written, validation-issue counts.
+
+## Deployment topology
+
+Two modes, same codebase:
+
+- **Local / reviewer demo** — `docker compose up`. Full self-contained stack: HAPI FHIR + Postgres + bridge + viewer.
+- **Deployed showcase** — bridge on AWS EC2 (cohabiting with the author's Provender app, ~150 MB footprint), viewer shipped as a static Vue 3 SPA to Cloudflare Pages, FHIR hosted on Medplum cloud's Developer plan. The bridge's `BRIDGE_FHIR_BASE_URL` env var swaps the target with zero code changes. Mirrors real-world production — no one self-hosts HAPI in production; they use HealthLake / Google Cloud Healthcare / Medplum.
+
+## Running the official HL7 FHIR Validator
+
+For serious conformance checks (not just schema validation), run the
+HL7-blessed validator against the mapper outputs. Requires Java 11+; the
+~150 MB validator jar is cached under `tmp/` after the first run.
+
+```bash
+make fhir-validate
+```
+
+The report lands in `tmp/fhir-validation-report.json`. This is the same
+validator used by the HAPI reference implementation and ONC's Inferno test
+suite.
+
 ## Roadmap
 
 - [x] **Phase 0** — Repo scaffolding, Docker Compose, CI
 - [x] **Phase 1** — MLLP listener, ADT^A01 → Patient + Encounter, golden-file tests
 - [x] **Phase 2** — ADT^A03/A08, ORU^R01 → Observation + DiagnosticReport, LOINC, US Core validation
 - [x] **Phase 3** — Vue viewer: split-pane v2/FHIR, clinical chart, live WS updates
-- [ ] **Phase 4** — Synthea integration, Inferno conformance, metrics dashboard, audit log viewer
-- [ ] **Phase 5 (stretch)** — SMART on FHIR launch, CDS Hooks, FHIR Subscriptions, Bulk Data export
+- [x] **Phase 4** — Replay CLI, curated demo fixtures, metrics endpoint + dashboard, Makefile, FHIR Validator integration
+- [ ] **Phase 5 (stretch)** — Synthea-generated traffic, ONC Inferno conformance report, SMART on FHIR launch, CDS Hooks, FHIR Subscriptions, Bulk Data export
 
 ## Repo layout
 
 ```
 .
 ├── bridge/              # Python HL7 v2 → FHIR service
-├── viewer/              # Vue 3 clinical viewer
-├── fixtures/            # Golden v2 messages + expected FHIR output
+│   ├── src/bridge/      # mllp, parsers, mappers, fhir_client, store, metrics, validators
+│   ├── tests/           # unit + integration + golden fixtures (49+ tests)
+│   └── scripts/replay.py # bridge-replay CLI entry point
+├── viewer/              # Vue 3 clinical viewer (Inbox, Patient chart, Metrics)
+├── fixtures/messages/   # Curated demo v2 messages (story-shaped)
 ├── docs/                # Architecture & design notes
+├── Makefile             # up, test, lint, replay, demo, reset, fhir-validate
 ├── docker-compose.yml
 └── .github/workflows/   # CI pipelines
 ```
+
+## Acknowledgements
+
+- **HL7 International** for the v2, FHIR, and v2-to-FHIR IG specifications that made this project possible.
+- **HAPI FHIR** for the reference FHIR R4 server used in local dev.
+- **hl7apy** for a solid Python v2 parser.
+- **fhir.resources** for Pydantic-typed FHIR R4 models.
+- **Medplum** for a genuinely free FHIR cloud tier that makes portfolio projects like this publicly demo-able.
 
 ## License
 

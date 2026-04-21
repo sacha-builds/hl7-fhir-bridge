@@ -30,7 +30,18 @@ export interface MessageDetail extends MessageSummary {
 
 export type BridgeEvent =
   | { event: 'hello'; data: { version: string } }
-  | { event: 'message.received'; data: MessageSummary };
+  | { event: 'message.received'; data: MessageSummary }
+  | { event: 'messages.cleared'; data: Record<string, never> };
+
+export interface MetricsSnapshot {
+  uptime_seconds: number;
+  started_at: string;
+  messages_total: number;
+  messages_by_type: Record<string, number>;
+  messages_by_ack_code: Record<string, number>;
+  resources_written: Record<string, number>;
+  validation_issues_by_severity: Record<string, number>;
+}
 
 const BASE = import.meta.env.VITE_BRIDGE_API_URL ?? 'http://localhost:8000';
 
@@ -62,6 +73,17 @@ export async function getHealth(): Promise<{ status: string; version: string }> 
   const response = await fetch(`${BASE}/health`);
   if (!response.ok) throw new Error(`health failed: ${response.status}`);
   return (await response.json()) as { status: string; version: string };
+}
+
+export async function getMetrics(): Promise<MetricsSnapshot> {
+  const response = await fetch(`${BASE}/metrics`);
+  if (!response.ok) throw new Error(`metrics failed: ${response.status}`);
+  return (await response.json()) as MetricsSnapshot;
+}
+
+export async function clearMessages(): Promise<void> {
+  const response = await fetch(`${BASE}/v2/messages`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`clearMessages failed: ${response.status}`);
 }
 
 export function openEventStream(onEvent: (event: BridgeEvent) => void): WebSocket {

@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, Response
 from bridge import __version__
 from bridge.config import settings
 from bridge.fhir_client import FHIRClient
+from bridge.metrics import Metrics
 from bridge.mllp import MLLPServer
 from bridge.router import MessageRouter
 from bridge.store import MessageStore
@@ -42,7 +43,8 @@ log = structlog.get_logger()
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     fhir_client = FHIRClient(settings.fhir_base_url)
     store = MessageStore()
-    router = MessageRouter(fhir_client, store=store)
+    metrics = Metrics()
+    router = MessageRouter(fhir_client, store=store, metrics=metrics)
     mllp = MLLPServer(host="0.0.0.0", port=settings.mllp_port, handler=router.handle)
     await mllp.start()
     serve_task = asyncio.create_task(mllp.serve_forever())
@@ -50,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.fhir_client = fhir_client
     app.state.router = router
     app.state.store = store
+    app.state.metrics = metrics
     app.state.mllp = mllp
 
     log.info(
@@ -120,6 +123,21 @@ def create_app(lifespan_fn: Lifespan = lifespan) -> FastAPI:
         if record is None:
             raise HTTPException(status_code=404, detail="message not found")
         return record.to_detail()
+
+    @app.delete("/v2/messages", status_code=204)
+    async def clear_messages() -> Response:
+        """Clear the in-memory inbox. Useful for resetting between demos."""
+        store: MessageStore = app.state.store
+        metrics: Metrics | None = getattr(app.state, "metrics", None)
+        await store.clear()
+        if metrics is not None:
+            metrics.reset()
+        return Response(status_code=204)
+
+    @app.get("/metrics")
+    def metrics_snapshot() -> dict[str, Any]:
+        metrics: Metrics = app.state.metrics
+        return metrics.snapshot()
 
     @app.websocket("/ws/messages")
     async def messages_ws(websocket: WebSocket) -> None:
