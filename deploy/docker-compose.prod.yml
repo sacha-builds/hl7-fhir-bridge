@@ -1,0 +1,39 @@
+# Production docker-compose for the bridge, deployed onto a single host
+# (e.g. the user's AWS EC2 instance).
+#
+# - No HAPI FHIR and no Postgres: production FHIR lives at Medplum cloud.
+# - No viewer: the Vue 3 SPA ships to Cloudflare Pages as a static bundle.
+# - Bridge image is pulled from GHCR (published by GitHub Actions).
+# - Bind addresses are 127.0.0.1 so Caddy terminates TLS on the host and
+#   forwards to the bridge on localhost.
+#
+# Usage:
+#   cp deploy/.env.example deploy/.env   # then fill in real values
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+
+services:
+  bridge:
+    image: ${BRIDGE_IMAGE:-ghcr.io/sacha-builds/hl7-fhir-bridge/bridge:main}
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      BRIDGE_HTTP_PORT: "8000"
+      BRIDGE_MLLP_PORT: "2575"
+      BRIDGE_LOG_LEVEL: ${BRIDGE_LOG_LEVEL:-INFO}
+      BRIDGE_FHIR_BASE_URL: ${BRIDGE_FHIR_BASE_URL}
+      BRIDGE_FHIR_OAUTH_TOKEN_URL: ${BRIDGE_FHIR_OAUTH_TOKEN_URL:-}
+      BRIDGE_FHIR_OAUTH_CLIENT_ID: ${BRIDGE_FHIR_OAUTH_CLIENT_ID:-}
+      BRIDGE_FHIR_OAUTH_CLIENT_SECRET: ${BRIDGE_FHIR_OAUTH_CLIENT_SECRET:-}
+      BRIDGE_DEMO_REPLAY_INTERVAL_MINUTES: ${BRIDGE_DEMO_REPLAY_INTERVAL_MINUTES:-10}
+    ports:
+      # Only bind to loopback — Caddy on the host terminates TLS and proxies in.
+      - "127.0.0.1:8000:8000"
+      # MLLP stays internal by default. Uncomment to expose for real upstream
+      # sender integration (and add a firewall rule to restrict source IPs).
+      # - "0.0.0.0:2575:2575"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

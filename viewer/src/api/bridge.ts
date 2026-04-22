@@ -86,6 +86,12 @@ export async function clearMessages(): Promise<void> {
   if (!response.ok) throw new Error(`clearMessages failed: ${response.status}`);
 }
 
+export async function sendDemoMessage(): Promise<{ fixture: string | null }> {
+  const response = await fetch(`${BASE}/v2/demo/random`, { method: 'POST' });
+  if (!response.ok) throw new Error(`sendDemoMessage failed: ${response.status}`);
+  return (await response.json()) as { fixture: string | null };
+}
+
 export function openEventStream(onEvent: (event: BridgeEvent) => void): WebSocket {
   const wsUrl = BASE.replace(/^http/, 'ws') + '/ws/messages';
   const ws = new WebSocket(wsUrl);

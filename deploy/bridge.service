@@ -1,0 +1,30 @@
+# systemd unit — wraps the production docker-compose stack.
+#
+# Install:
+#   sudo cp deploy/bridge.service /etc/systemd/system/bridge.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now bridge.service
+#
+# Then `systemctl status bridge` shows health; `journalctl -u bridge -f`
+# tails logs.
+#
+# Adjust WorkingDirectory and User to match your host layout.
+
+[Unit]
+Description=HL7 v2 → FHIR Bridge
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/opt/hl7-fhir-bridge/deploy
+EnvironmentFile=/opt/hl7-fhir-bridge/deploy/.env
+ExecStartPre=/usr/bin/docker compose -f docker-compose.prod.yml pull
+ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
+User=deploy
+Group=deploy
+
+[Install]
+WantedBy=multi-user.target

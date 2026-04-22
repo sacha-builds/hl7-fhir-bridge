@@ -1,0 +1,25 @@
+# Caddy reverse proxy for the bridge. Caddy does automatic Let's Encrypt TLS.
+#
+# Install:
+#   sudo apt install -y caddy  (Debian/Ubuntu) or equivalent
+#
+# Drop this at /etc/caddy/Caddyfile (replacing bridge.yourdomain.com with
+# your real subdomain), then:
+#   sudo systemctl reload caddy
+#
+# Requires: DNS A-record for bridge.yourdomain.com → this EC2's public IP,
+# and ports 80/443 open in your security group.
+
+bridge.yourdomain.com {
+    # Caddy auto-handles the WebSocket Upgrade / Connection headers when
+    # proxying to an HTTP upstream, so /ws/messages just works.
+    reverse_proxy http://127.0.0.1:8000
+
+    # Structured access logs (JSON) to /var/log/caddy/bridge.log
+    log {
+        output file /var/log/caddy/bridge.log
+        format json
+    }
+
+    encode zstd gzip
+}

@@ -36,7 +36,9 @@ services:
 
   bridge:
     build:
-      context: ./bridge
+      # Context is repo root so the Dockerfile can COPY fixtures/ as well.
+      context: .
+      dockerfile: bridge/Dockerfile
     depends_on:
       hapi-fhir:
         condition: service_started

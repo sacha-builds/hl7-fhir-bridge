@@ -1,0 +1,20 @@
+# systemd timer — pulls the latest image every 10 minutes and restarts the
+# bridge if it changed. Gives you rough continuous deployment without a
+# webhook or CI → SSH dance.
+#
+# Install alongside redeploy.service:
+#   sudo cp deploy/redeploy.service /etc/systemd/system/
+#   sudo cp deploy/redeploy.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now redeploy.timer
+
+[Unit]
+Description=Pull latest bridge image every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=redeploy.service
+
+[Install]
+WantedBy=timers.target

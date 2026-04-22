@@ -115,7 +115,9 @@ Then open:
 Two modes, same codebase:
 
 - **Local / reviewer demo** — `docker compose up`. Full self-contained stack: HAPI FHIR + Postgres + bridge + viewer.
-- **Deployed showcase** — bridge on AWS EC2 (cohabiting with the author's Provender app, ~150 MB footprint), viewer shipped as a static Vue 3 SPA to Cloudflare Pages, FHIR hosted on Medplum cloud's Developer plan. The bridge's `BRIDGE_FHIR_BASE_URL` env var swaps the target with zero code changes. Mirrors real-world production — no one self-hosts HAPI in production; they use HealthLake / Google Cloud Healthcare / Medplum.
+- **Deployed showcase** — bridge on AWS EC2 (cohabiting with the author's Provender app, ~150 MB footprint), viewer shipped as a static Vue 3 SPA to Cloudflare Pages, FHIR hosted on Medplum cloud's Developer plan with OAuth2 client-credentials auth. The bridge's `BRIDGE_FHIR_BASE_URL` + `BRIDGE_FHIR_OAUTH_*` env vars swap the target with zero code changes. Mirrors real-world production — no one self-hosts HAPI in production; they use HealthLake / Google Cloud Healthcare / Medplum.
+
+Full step-by-step in [deploy/README.md](deploy/README.md).
 
 ## Running the official HL7 FHIR Validator
 

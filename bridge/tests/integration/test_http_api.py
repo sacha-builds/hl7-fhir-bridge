@@ -172,6 +172,46 @@ def test_metrics_endpoint_reflects_processed_messages(app_with_mock_fhir) -> Non
         assert after["resources_written"]["Encounter"] == 1
 
 
+def test_demo_random_endpoint_processes_a_fixture(
+    app_with_mock_fhir, tmp_path, monkeypatch
+) -> None:
+    """POST /v2/demo/random picks a bundled fixture and runs it through the router."""
+    app, _ = app_with_mock_fhir
+    # Copy a fixture into a temp dir and point the seeder config at it.
+    fixtures_dir = Path(__file__).resolve().parents[1] / "fixtures"
+    staged = tmp_path / "messages"
+    staged.mkdir()
+    (staged / "a.hl7").write_text((fixtures_dir / "adt_a01_simple.hl7").read_text())
+
+    from bridge import config as config_module
+
+    monkeypatch.setattr(config_module.settings, "demo_fixtures_path", str(staged))
+
+    with TestClient(app) as client:
+        response = client.post("/v2/demo/random")
+        assert response.status_code == 200
+        assert response.json()["fixture"] == "a.hl7"
+
+        messages = client.get("/v2/messages").json()
+        assert len(messages) == 1
+        assert messages[0]["message_type"] == "ADT^A01"
+
+
+def test_demo_random_endpoint_returns_404_when_no_fixtures(
+    app_with_mock_fhir, tmp_path, monkeypatch
+) -> None:
+    app, _ = app_with_mock_fhir
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    from bridge import config as config_module
+
+    monkeypatch.setattr(config_module.settings, "demo_fixtures_path", str(empty))
+
+    with TestClient(app) as client:
+        response = client.post("/v2/demo/random")
+        assert response.status_code == 404
+
+
 def test_delete_v2_messages_clears_inbox_and_metrics(app_with_mock_fhir) -> None:
     app, _ = app_with_mock_fhir
     fixtures = Path(__file__).resolve().parents[1] / "fixtures"

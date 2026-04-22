@@ -1,0 +1,13 @@
+# systemd oneshot — runs deploy.sh. Triggered by redeploy.timer.
+
+[Unit]
+Description=Redeploy bridge from GHCR if image changed
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/hl7-fhir-bridge
+ExecStart=/opt/hl7-fhir-bridge/deploy/deploy.sh
+User=deploy
+Group=deploy
